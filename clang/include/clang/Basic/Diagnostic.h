@@ -289,6 +289,9 @@ public:
 
     /// Expr *
     ak_expr,
+
+    /// AttributeCommonInfo *
+    ak_attr_info,
   };
 
   /// Represents on argument value, which is a union discriminated
@@ -424,10 +427,13 @@ private:
     bool empty() const { return Files.empty(); }
 
     /// Clear out this map.
-    void clear() {
+    void clear(bool Soft) {
+      // Just clear the cache when in soft mode.
       Files.clear();
-      FirstDiagState = CurDiagState = nullptr;
-      CurDiagStateLoc = SourceLocation();
+      if (!Soft) {
+        FirstDiagState = CurDiagState = nullptr;
+        CurDiagStateLoc = SourceLocation();
+      }
     }
 
     /// Produce a debugging dump of the diagnostic state.
@@ -889,7 +895,10 @@ public:
   /// \param FormatString A fixed diagnostic format string that will be hashed
   /// and mapped to a unique DiagID.
   template <unsigned N>
-  // TODO: Deprecate this once all uses are removed from Clang.
+  // FIXME: this API should almost never be used; custom diagnostics do not
+  // have an associated diagnostic group and thus cannot be controlled by users
+  // like other diagnostics. The number of times this API is used in Clang
+  // should only ever be reduced, not increased.
   // [[deprecated("Use a CustomDiagDesc instead of a Level")]]
   unsigned getCustomDiagID(Level L, const char (&FormatString)[N]) {
     return Diags->getCustomDiagID((DiagnosticIDs::Level)L,
@@ -920,6 +929,10 @@ public:
   /// Reset the state of the diagnostic object to its initial configuration.
   /// \param[in] soft - if true, doesn't reset the diagnostic mappings and state
   void Reset(bool soft = false);
+  /// We keep a cache of FileIDs for diagnostics mapped by pragmas. These might
+  /// get invalidated when diagnostics engine is shared across different
+  /// compilations. Provide users with a way to reset that.
+  void ResetPragmas();
 
   //===--------------------------------------------------------------------===//
   // DiagnosticsEngine classification and reporting interfaces.
